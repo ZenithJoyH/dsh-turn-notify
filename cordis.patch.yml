@@ -1,0 +1,7 @@
+# dsh-turn-notify bundle patch for DeepSeek Harness (dsh).
+- insert:
+    - id: dsh-turn-notify
+      name: 'dsh-turn-notify'
+      config:
+        reasons: [completed, aborted, blocked, error, max-tokens]
+        skipSubagents: true
