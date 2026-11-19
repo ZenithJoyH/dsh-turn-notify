@@ -31,6 +31,14 @@ function makeEnv() {
     return el
   }
 
+  const winListeners = {}
+  const docListeners = {}
+  const storage = {
+    data: {},
+    getItem(k) { return this.data[k] ?? null },
+    setItem(k, v) { this.data[k] = String(v) },
+  }
+
   const document = {
     body: {
       children: [],
@@ -38,10 +46,15 @@ function makeEnv() {
     },
     querySelector() { return null },
     createElement() { return element() },
+    addEventListener(type, fn) { docListeners[type] = fn },
+    removeEventListener(type) { delete docListeners[type] },
   }
 
   globalThis.window = {
     focus() {},
+    localStorage: storage,
+    addEventListener(type, fn) { winListeners[type] = fn },
+    removeEventListener(type) { delete winListeners[type] },
     __ModuleLoader__: { load(def) { loaded = def; bundleDef = def } },
   }
   globalThis.document = document
@@ -51,6 +64,8 @@ function makeEnv() {
   return {
     notifications,
     toasts,
+    winListeners,
+    docListeners,
     load: async () => {
       await import('../lib/client.js')
       assert.ok(bundleDef, 'client bundle 已注册')
@@ -117,6 +132,42 @@ test('旧投影不会触发推送，新投影才推送（内容对应本轮）',
   env.notifications[0].onclick()
   assert.deepEqual(ctx.opened, ['s1'], '点击通知调用 sessions.open(会话 id)')
   ctx.dispose()
+})
+
+test('点击通知拿不到 onclick 时，窗口 focus 兜底跳转；页面内点击则取消', async () => {
+  // 情况 A：通知后窗口获得焦点（Electron 点击通知的典型行为）→ 跳转
+  const envA = makeEnv()
+  const modA = await envA.load()
+  const byIdA = {
+    s3: { running: true, displayTitle: 'A', projectionValues: { [KEY]: { seq: 1, endedAt: 1, text: '', title: '' } } },
+  }
+  const ctxA = makeCtx(byIdA)
+  modA.apply(ctxA)
+  byIdA.s3.running = false
+  byIdA.s3.projectionValues[KEY] = { seq: 2, endedAt: Date.now(), text: '会话「A」已完成。', title: '任务已完成' }
+  ctxA.fire()
+  await new Promise((r) => setTimeout(r, 400))
+  assert.equal(envA.notifications.length, 1)
+  envA.winListeners.focus()
+  assert.deepEqual(ctxA.opened, ['s3'], 'focus 兜底打开会话')
+  ctxA.dispose()
+
+  // 情况 B：用户先在页面里点了一下（mousedown）→ 说明是手动切窗口，不跳转
+  const envB = makeEnv()
+  const modB = await envB.load()
+  const byIdB = {
+    s4: { running: true, displayTitle: 'B', projectionValues: { [KEY]: { seq: 1, endedAt: 1, text: '', title: '' } } },
+  }
+  const ctxB = makeCtx(byIdB)
+  modB.apply(ctxB)
+  byIdB.s4.running = false
+  byIdB.s4.projectionValues[KEY] = { seq: 2, endedAt: Date.now(), text: '会话「B」已完成。', title: '任务已完成' }
+  ctxB.fire()
+  await new Promise((r) => setTimeout(r, 400))
+  envB.docListeners.mousedown({})
+  envB.winListeners.focus()
+  assert.deepEqual(ctxB.opened, [], '页面内手动点击后不自动跳转')
+  ctxB.dispose()
 })
 
 test('系统通知不可用时才用页内 toast 兜底', async () => {

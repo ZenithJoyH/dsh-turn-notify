@@ -50,8 +50,16 @@ source: { kind: 'plugin:dsh-turn-notify', reasonKind, titleText, turn, endedAt }
 ## 点击通知跳转
 
 系统通知的 `onclick` 会调用 `ctx.sessions.open(sessionId)`（DSH 官方切会话入口，`dsh-sidechat` 同样用它），
-直接切到对应会话；接口不可用时退回只聚焦窗口。兜底 toast 卡片本身不接收鼠标，
-但带一个可点的「查看」按钮，点击同样跳转。
+直接切到对应会话；接口不可用时退回只聚焦窗口。
+
+macOS/Electron 下点击系统通知有时只把窗口带到前台、不触发渲染进程的 `onclick`，
+因此还有一层兜底：发通知时记下会话，窗口在 20 秒内重新获得焦点就直接跳转；
+如果用户先在页面里点了一下（mousedown），视为手动切窗口，取消这次自动跳转。
+
+兜底 toast 卡片本身不接收鼠标，但带一个可点的「查看」按钮，点击同样跳转。
+
+排查用：最近 20 条 `notification / click / focus / mousedown-clear / open-ok / open-failed`
+事件会写进 `localStorage['dsh-turn-notify.debug']`。
 
 ## 通知文案
 
