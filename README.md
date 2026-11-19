@@ -47,6 +47,12 @@ source: { kind: 'plugin:dsh-turn-notify', reasonKind, titleText, turn, endedAt }
 
 > 观察者收到的 `assistant/message` 载荷可能被裁剪，所以不能只依赖第 2 条。
 
+## 点击通知跳转
+
+系统通知的 `onclick` 会调用 `ctx.sessions.open(sessionId)`（DSH 官方切会话入口，`dsh-sidechat` 同样用它），
+直接切到对应会话；接口不可用时退回只聚焦窗口。兜底 toast 卡片本身不接收鼠标，
+但带一个可点的「查看」按钮，点击同样跳转。
+
 ## 通知文案
 
 ```text
