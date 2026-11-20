@@ -39,22 +39,14 @@ source: { kind: 'plugin:dsh-turn-notify', reasonKind, titleText, turn, endedAt }
 
 否则继续轮询（300ms 间隔，最多 8 秒），超时用**通用文案**兜底——绝不把上一轮的正文当成本轮。
 
-## 摘要来源（按可靠性排序）
-
-1. 官方 `turnOutline` 投影里本轮的 `response`（宿主已落盘，最可靠）；
-2. 实时 `assistant/message` 事件的 `data.message.content`（跳过 reasoning 块）；
-3. 都没有 → 正文只写「会话「X」已完成。」。
-
-> 观察者收到的 `assistant/message` 载荷可能被裁剪，所以不能只依赖第 2 条。
-
 ## 审批 / 提问提醒
 
-- **权限审批**：会话列表快照 `pendingInteraction === 'approval'` 时立即提醒；正文优先取宿主
-  审批投影 `dsh-turn-notify-approval`（`approval/asked` 写入工具名 + 可选原因，
-  `approval/decided` 清空），没有投影时用通用文案。同一次审批只提醒一次，结束后再来新审批会再提醒。
-- **AI 提问**：`pendingInteraction === 'question'` / `'plan-review'` 时提醒一次
-  「AI 正在向你提问」。
-- 两者都不依赖 `running` 边沿（等待期间会话仍是 running），点通知同样会跳到对应会话。
+- **权限审批**：会话列表快照 `pendingInteraction === 'approval'` 时立即提醒，正文形如
+  「会话「X」需要审批（工具：bash），请前往处理。」；工具名来自宿主审批投影
+  `dsh-turn-notify-approval`（`approval/asked` 写入、`approval/decided` 清空）。
+- **AI 提问**：`pendingInteraction === 'question'` / `'plan-review'` 时提醒
+  「会话「X」正在等待你的回答」。
+- 同一次审批/提问只提醒一次；两者都不依赖 `running` 边沿，点通知同样会跳到对应会话。
 
 ## 哪些会话会提醒
 
@@ -81,13 +73,13 @@ macOS/Electron 下点击系统通知有时只把窗口带到前台、不触发�
 
 ## 通知文案
 
-```text
-会话「重构登录」已完成：已完成重构，测试通过。   ← 完成，带最终回复摘要
-会话「连接问题」出错：Connection error.           ← 出错，带错误详情
-```
+只保留「哪个会话 + 结果」，不放大段回复或错误详情：
 
-摘要取该轮最后一条 `assistant/message` 的文本，单行化并截断到 100 字，让通知正文与
-实际任务内容对应，而不是只有一句「已完成」。
+```text
+会话「重构登录」已完成。
+会话「连接问题」出错。
+会话「需要审批的会话」需要审批（工具：bash），请前往处理。
+```
 
 ## 安装
 

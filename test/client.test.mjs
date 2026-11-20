@@ -200,13 +200,14 @@ test('审批/提问挂起时立即提醒且同一审批只提醒一次', async (
       running: true,
       displayTitle: '审批会话',
       pendingInteraction: 'approval',
-      projectionValues: { [AKEY]: { id: 'a1', title: '需要权限审批', body: '会话请求使用 bash，请前往审批。' } },
+      projectionValues: { [AKEY]: { id: 'a1', title: '需要权限审批', toolName: 'bash', body: 'x' } },
     },
   }
   const ctx = makeCtx(byId)
   mod.apply(ctx)
   assert.equal(env.notifications.length, 1)
   assert.equal(env.notifications[0].title, '需要权限审批')
+  assert.match(env.notifications[0].opts.body, /会话「审批会话」需要审批/)
   assert.match(env.notifications[0].opts.body, /bash/)
   ctx.fire()
   assert.equal(env.notifications.length, 1, '同一审批不重复提醒')
@@ -216,7 +217,7 @@ test('审批/提问挂起时立即提醒且同一审批只提醒一次', async (
   byId.s6.projectionValues = {}
   ctx.fire()
   byId.s6.pendingInteraction = 'approval'
-  byId.s6.projectionValues = { [AKEY]: { id: 'a2', title: '需要权限审批', body: '会话请求使用 write，请前往审批。' } }
+  byId.s6.projectionValues = { [AKEY]: { id: 'a2', title: '需要权限审批', toolName: 'write', body: 'x' } }
   ctx.fire()
   assert.equal(env.notifications.length, 2)
 
@@ -225,6 +226,7 @@ test('审批/提问挂起时立即提醒且同一审批只提醒一次', async (
   ctx.fire()
   assert.equal(env.notifications.length, 3)
   assert.equal(env.notifications[2].title, 'AI 正在向你提问')
+  assert.match(env.notifications[2].opts.body, /会话「审批会话」正在等待你的回答/)
   ctx.dispose()
 })
 

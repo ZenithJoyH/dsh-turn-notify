@@ -53,7 +53,7 @@ function makeSession(id = 's1', title = '重构登录') {
   }
 }
 
-test('turn/end 追加带标题与回复摘要的系统消息，并写入投影', async () => {
+test('turn/end 只追加「会话 + 结果」的系统消息，并写入投影', async () => {
   const ctx = makeCtx()
   apply(ctx, { reasons: ['completed'] })
   const session = makeSession()
@@ -62,7 +62,6 @@ test('turn/end 追加带标题与回复摘要的系统消息，并写入投影',
   ctx.fire(session, {
     type: 'assistant/message',
     time: 1500,
-    // 真实事件形状：正文在 message.content
     data: { turn: 1, message: { content: [{ type: 'text', text: '已完成重构，测试通过。' }] } },
   })
   ctx.fire(session, { type: 'turn/end', time: 2000, data: { turn: 1, reason: { kind: 'completed' } } })
@@ -71,8 +70,7 @@ test('turn/end 追加带标题与回复摘要的系统消息，并写入投影',
   await new Promise((r) => setTimeout(r, 0))
   assert.equal(session.appended.length, 1)
   const msg = session.appended[0].data
-  assert.match(msg.content[0].text, /会话「重构登录」已完成/)
-  assert.match(msg.content[0].text, /测试通过/)
+  assert.equal(msg.content[0].text, '会话「重构登录」已完成。')
   assert.equal(msg.source.reasonKind, 'completed')
   assert.equal(msg.source.turn, 1)
   assert.equal(msg.source.endedAt, 2000)
@@ -92,36 +90,6 @@ test('turn/end 追加带标题与回复摘要的系统消息，并写入投影',
   assert.equal(reg.state.seq, 42)
 })
 
-test('热加载错过 turn/start 时，仍能从 assistant/message 补建摘要', async () => {
-  const ctx = makeCtx()
-  apply(ctx, { reasons: ['completed'] })
-  const session = makeSession('s3', '热加载会话')
-  // 故意不发 turn/start，模拟插件在轮次中途被 HMR 重新加载
-  ctx.fire(session, {
-    type: 'assistant/message',
-    time: 1500,
-    data: { turn: 2, message: { content: [{ type: 'text', text: '热加载后仍然拿到了摘要。' }] } },
-  })
-  ctx.fire(session, { type: 'turn/end', time: 2000, data: { turn: 2, reason: { kind: 'completed' } } })
-  await new Promise((r) => setTimeout(r, 0))
-  assert.match(session.appended[0].data.content[0].text, /热加载后仍然拿到了摘要/)
-})
-
-test('观察者事件缺正文时，从 turnOutline 投影取摘要', async () => {
-  const ctx = makeCtx()
-  apply(ctx, { reasons: ['completed'] })
-  // apply 之后注入的 registry 才是插件持有的那一个：给它补 turnOutline 快照
-  ctx.__projectionRegistry.snapshot = () => ({
-    values: { turnOutline: { turns: [{ turn: 5, prompt: 'x', response: '投影里的最终回复摘要' }] } },
-  })
-  const session = makeSession('s4', '投影摘要')
-  ctx.fire(session, { type: 'turn/start', time: 1000, data: { turn: 5 } })
-  // 事件里没有 message 载荷
-  ctx.fire(session, { type: 'turn/end', time: 2000, data: { turn: 5, reason: { kind: 'completed' } } })
-  await new Promise((r) => setTimeout(r, 0))
-  assert.match(session.appended[0].data.content[0].text, /投影里的最终回复摘要/)
-})
-
 test('审批投影：asked 写入、decided 清空', () => {
   const ctx = makeCtx()
   apply(ctx, { reasons: ['completed'] })
@@ -139,7 +107,7 @@ test('审批投影：asked 写入、decided 清空', () => {
   assert.equal(reg.state.body, '')
 })
 
-test('error 轮次带错误详情，且不再追加 completed 文案', async () => {
+test('error 轮次只写会话 + 出错，不塞长错误详情', async () => {
   const ctx = makeCtx()
   apply(ctx, { reasons: ['completed', 'error'] })
   const session = makeSession('s2', '连接问题')
@@ -151,6 +119,5 @@ test('error 轮次带错误详情，且不再追加 completed 文案', async () 
   })
   await new Promise((r) => setTimeout(r, 0))
   const text = session.appended[0].data.content[0].text
-  assert.match(text, /会话「连接问题」出错/)
-  assert.match(text, /Connection error/)
+  assert.equal(text, '会话「连接问题」出错。')
 })
