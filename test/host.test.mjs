@@ -16,14 +16,22 @@ function makeCtx() {
     logger: { warn() {} },
     on(type, fn) { handlers.push({ type, fn }) },
     inject(names, cb) {
-      const state = { kind: '', title: '', text: '', turn: 0, endedAt: 0, seq: 0 }
-      ctx.__registry = {
-        registered: null,
-        register(def) { this.registered = def; this.state = def.init() },
+      const entries = new Map()
+      const registry = {
+        register(def) {
+          const entry = {
+            registered: def,
+            state: def.init(),
+            emit(event) { this.state = this.registered.apply(this.state, event) },
+          }
+          entries.set(def.key, entry)
+          if (ctx.__registry === undefined) ctx.__registry = entry
+        },
         snapshot() { return { values: {} } },
-        emit(event) { this.state = this.registered.apply(this.state, event) },
       }
-      cb({ sessionProjections: ctx.__registry })
+      ctx.__regs = entries
+      ctx.__projectionRegistry = registry
+      cb({ sessionProjections: registry })
     },
     root: { get: () => undefined },
   }
@@ -103,7 +111,7 @@ test('观察者事件缺正文时，从 turnOutline 投影取摘要', async () =
   const ctx = makeCtx()
   apply(ctx, { reasons: ['completed'] })
   // apply 之后注入的 registry 才是插件持有的那一个：给它补 turnOutline 快照
-  ctx.__registry.snapshot = () => ({
+  ctx.__projectionRegistry.snapshot = () => ({
     values: { turnOutline: { turns: [{ turn: 5, prompt: 'x', response: '投影里的最终回复摘要' }] } },
   })
   const session = makeSession('s4', '投影摘要')
@@ -112,6 +120,23 @@ test('观察者事件缺正文时，从 turnOutline 投影取摘要', async () =
   ctx.fire(session, { type: 'turn/end', time: 2000, data: { turn: 5, reason: { kind: 'completed' } } })
   await new Promise((r) => setTimeout(r, 0))
   assert.match(session.appended[0].data.content[0].text, /投影里的最终回复摘要/)
+})
+
+test('审批投影：asked 写入、decided 清空', () => {
+  const ctx = makeCtx()
+  apply(ctx, { reasons: ['completed'] })
+  const reg = ctx.__regs.get('dsh-turn-notify-approval')
+  assert.ok(reg, '审批投影已注册')
+
+  reg.emit({ type: 'approval/asked', seq: 77, data: { id: 'a1', toolName: 'bash', reason: '需要写文件' } })
+  assert.equal(reg.state.id, 'a1')
+  assert.equal(reg.state.title, '需要权限审批')
+  assert.match(reg.state.body, /bash/)
+  assert.match(reg.state.body, /需要写文件/)
+
+  reg.emit({ type: 'approval/decided', seq: 78, data: { id: 'a1' } })
+  assert.equal(reg.state.id, '')
+  assert.equal(reg.state.body, '')
 })
 
 test('error 轮次带错误详情，且不再追加 completed 文案', async () => {

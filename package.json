@@ -15,5 +15,8 @@
     "client": { "inject": ["@deepseek-ai/dsh-client-runtime"], "platform": "web" }
   },
   "license": "MIT",
+  "scripts": {
+    "test": "node --test test/*.mjs"
+  },
   "engines": { "node": ">=22" }
 }

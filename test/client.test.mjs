@@ -191,6 +191,43 @@ test('没有 uiWorkspace 服务时退回 sessions.open', async () => {
   ctx.dispose()
 })
 
+test('审批/提问挂起时立即提醒且同一审批只提醒一次', async () => {
+  const env = makeEnv()
+  const mod = await env.load()
+  const AKEY = 'dsh-turn-notify-approval'
+  const byId = {
+    s6: {
+      running: true,
+      displayTitle: '审批会话',
+      pendingInteraction: 'approval',
+      projectionValues: { [AKEY]: { id: 'a1', title: '需要权限审批', body: '会话请求使用 bash，请前往审批。' } },
+    },
+  }
+  const ctx = makeCtx(byId)
+  mod.apply(ctx)
+  assert.equal(env.notifications.length, 1)
+  assert.equal(env.notifications[0].title, '需要权限审批')
+  assert.match(env.notifications[0].opts.body, /bash/)
+  ctx.fire()
+  assert.equal(env.notifications.length, 1, '同一审批不重复提醒')
+
+  // 审批结束后再来一个新审批 → 再提醒一次
+  delete byId.s6.pendingInteraction
+  byId.s6.projectionValues = {}
+  ctx.fire()
+  byId.s6.pendingInteraction = 'approval'
+  byId.s6.projectionValues = { [AKEY]: { id: 'a2', title: '需要权限审批', body: '会话请求使用 write，请前往审批。' } }
+  ctx.fire()
+  assert.equal(env.notifications.length, 2)
+
+  // 提问挂起 → 提醒
+  byId.s6.pendingInteraction = 'question'
+  ctx.fire()
+  assert.equal(env.notifications.length, 3)
+  assert.equal(env.notifications[2].title, 'AI 正在向你提问')
+  ctx.dispose()
+})
+
 test('子代理会话完成不推送（避免「任务已结束」噪音）', async () => {
   const env = makeEnv()
   const mod = await env.load()

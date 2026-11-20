@@ -47,6 +47,15 @@ source: { kind: 'plugin:dsh-turn-notify', reasonKind, titleText, turn, endedAt }
 
 > 观察者收到的 `assistant/message` 载荷可能被裁剪，所以不能只依赖第 2 条。
 
+## 审批 / 提问提醒
+
+- **权限审批**：会话列表快照 `pendingInteraction === 'approval'` 时立即提醒；正文优先取宿主
+  审批投影 `dsh-turn-notify-approval`（`approval/asked` 写入工具名 + 可选原因，
+  `approval/decided` 清空），没有投影时用通用文案。同一次审批只提醒一次，结束后再来新审批会再提醒。
+- **AI 提问**：`pendingInteraction === 'question'` / `'plan-review'` 时提醒一次
+  「AI 正在向你提问」。
+- 两者都不依赖 `running` 边沿（等待期间会话仍是 running），点通知同样会跳到对应会话。
+
 ## 哪些会话会提醒
 
 - **主会话**：完成 / 出错 / 中止 / 阻塞 / 达到上限时提醒；
