@@ -75,11 +75,15 @@ function makeEnv() {
   }
 }
 
-function makeCtx(byId) {
+function makeCtx(byId, options = {}) {
   const listeners = []
   const opened = []
   return {
     opened,
+    get(name) {
+      if (name !== 'uiWorkspace' || options.noWorkspace) return undefined
+      return { openSession(id) { opened.push(id) } }
+    },
     sessions: {
       open(id) { opened.push(id) },
       list: {
@@ -128,9 +132,9 @@ test('旧投影不会触发推送，新投影才推送（内容对应本轮）',
   assert.match(env.notifications[0].opts.body, /修好了/)
   assert.equal(env.toasts.length, 0, '系统通知成功时不叠页内 toast')
 
-  // 点击通知 → 跳到对应会话
+  // 点击通知 → 跳到对应会话（优先 uiWorkspace.openSession）
   env.notifications[0].onclick()
-  assert.deepEqual(ctx.opened, ['s1'], '点击通知调用 sessions.open(会话 id)')
+  assert.deepEqual(ctx.opened, ['s1'], '点击通知调用 uiWorkspace.openSession(会话 id)')
   ctx.dispose()
 })
 
@@ -168,6 +172,23 @@ test('点击通知拿不到 onclick 时，窗口 focus 兜底跳转；页面内�
   envB.winListeners.focus()
   assert.deepEqual(ctxB.opened, [], '页面内手动点击后不自动跳转')
   ctxB.dispose()
+})
+
+test('没有 uiWorkspace 服务时退回 sessions.open', async () => {
+  const env = makeEnv()
+  const mod = await env.load()
+  const byId = {
+    s5: { running: true, displayTitle: 'C', projectionValues: { [KEY]: { seq: 1, endedAt: 1, text: '', title: '' } } },
+  }
+  const ctx = makeCtx(byId, { noWorkspace: true })
+  mod.apply(ctx)
+  byId.s5.running = false
+  byId.s5.projectionValues[KEY] = { seq: 2, endedAt: Date.now(), text: '会话「C」已完成。', title: '任务已完成' }
+  ctx.fire()
+  await new Promise((r) => setTimeout(r, 400))
+  env.notifications[0].onclick()
+  assert.deepEqual(ctx.opened, ['s5'])
+  ctx.dispose()
 })
 
 test('子代理会话完成不推送（避免「任务已结束」噪音）', async () => {
