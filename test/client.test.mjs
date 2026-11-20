@@ -170,6 +170,27 @@ test('点击通知拿不到 onclick 时，窗口 focus 兜底跳转；页面内�
   ctxB.dispose()
 })
 
+test('子代理会话完成不推送（避免「任务已结束」噪音）', async () => {
+  const env = makeEnv()
+  const mod = await env.load()
+  const byId = {
+    sub1: {
+      running: true,
+      origin: 'subagent',
+      displayTitle: '角色：执行者 (worker)，任务',
+      projectionValues: {},
+    },
+  }
+  const ctx = makeCtx(byId)
+  mod.apply(ctx)
+  byId.sub1.running = false
+  ctx.fire()
+  await new Promise((r) => setTimeout(r, 400))
+  assert.equal(env.notifications.length, 0)
+  assert.equal(env.toasts.length, 0)
+  ctx.dispose()
+})
+
 test('系统通知不可用时才用页内 toast 兜底', async () => {
   const env = makeEnv()
   globalThis.Notification.permission = 'denied'

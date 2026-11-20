@@ -47,6 +47,14 @@ source: { kind: 'plugin:dsh-turn-notify', reasonKind, titleText, turn, endedAt }
 
 > 观察者收到的 `assistant/message` 载荷可能被裁剪，所以不能只依赖第 2 条。
 
+## 哪些会话会提醒
+
+- **主会话**：完成 / 出错 / 中止 / 阻塞 / 达到上限时提醒；
+- **子代理会话**（`origin === 'subagent'`）：不提醒——宿主侧不写投影，客户端也直接跳过，
+  否则每个子代理轮次都会在超时后弹一条「任务已结束」噪音；
+- 从未产生过通知投影的会话：即使超时也不发兜底通知（基线为 0 直接静默），只有
+  曾经正常通知过的会话在投影迟到时才用通用文案保底。
+
 ## 点击通知跳转
 
 系统通知的 `onclick` 会调用 `ctx.sessions.open(sessionId)`（DSH 官方切会话入口，`dsh-sidechat` 同样用它），
