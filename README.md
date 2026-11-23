@@ -60,10 +60,12 @@ source: { kind: 'plugin:dsh-turn-notify', reasonKind, titleText, turn, endedAt }
 
 系统通知的 `onclick`：
 
-1. **sidechat 子会话**：先查 `localStorage['dsh.sidechat.v1.threads.<parentId>']` 找到父会话，
+1. **已作为主会话打开的会话**（会话列表 `retainedBy.mainView > 0`）：一律走主视图，
+   即使它曾在 sidechat 里出现过（「打开成对话」会留下历史线程记录，不能只按记录判断）；
+2. **sidechat 子会话**：查 `localStorage['dsh.sidechat.v1.threads.<parentId>']` 找到父会话，
    再走 `ctx.get('sidebarRight').openTab('side-chat', {params:{parentSessionId, childId}})`，
-   开在**右侧边栏**里（否则会被当成主会话打开）；
-2. **普通会话**：`ctx.get('uiWorkspace').openSession(sessionId)`——侧栏点击会话时走的入口；
+   开在**右侧边栏**里；
+3. **普通会话**：`ctx.get('uiWorkspace').openSession(sessionId)`——侧栏点击会话时走的入口；
 3. 旧宿主退回 `ctx.sessions.open()`，再不行只聚焦窗口。
 
 > `ctx.sessions` 上并没有 `open()`，之前用它只会得到 `open-missing`。

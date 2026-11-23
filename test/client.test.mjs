@@ -201,6 +201,32 @@ test('sidechat 子会话点击通知时开在右侧边栏，而不是主视图',
   ctx.dispose()
 })
 
+test('已作为主会话打开的会话，即使有 sidechat 历史记录也走主视图', async () => {
+  const env = makeEnv()
+  const mod = await env.load()
+  const tabs = []
+  globalThis.window.localStorage.setItem('dsh.sidechat.v1.threads.parent-2', JSON.stringify([{ childId: 'wasSide', topic: '' }]))
+  const byId = {
+    wasSide: {
+      running: true,
+      displayTitle: '引用回复插件',
+      retainedBy: { mainView: 1 },
+      projectionValues: { [KEY]: { seq: 1, endedAt: 1, text: '', title: '' } },
+    },
+  }
+  const sidebar = { openTab(kind, opts) { tabs.push({ kind, opts }) } }
+  const ctx = makeCtx(byId, { sidebar })
+  mod.apply(ctx)
+  byId.wasSide.running = false
+  byId.wasSide.projectionValues[KEY] = { seq: 2, endedAt: Date.now(), text: '会话「引用回复插件」已完成。', title: '任务已完成' }
+  ctx.fire()
+  await new Promise((r) => setTimeout(r, 400))
+  env.notifications[0].onclick()
+  assert.equal(tabs.length, 0, '不应再开成侧聊')
+  assert.deepEqual(ctx.opened, ['wasSide'], '应打开主会话')
+  ctx.dispose()
+})
+
 test('没有 uiWorkspace 服务时退回 sessions.open', async () => {
   const env = makeEnv()
   const mod = await env.load()
