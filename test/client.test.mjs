@@ -35,6 +35,8 @@ function makeEnv() {
   const docListeners = {}
   const storage = {
     data: {},
+    get length() { return Object.keys(this.data).length },
+    key(i) { return Object.keys(this.data)[i] },
     getItem(k) { return this.data[k] ?? null },
     setItem(k, v) { this.data[k] = String(v) },
   }
@@ -80,7 +82,9 @@ function makeCtx(byId, options = {}) {
   const opened = []
   return {
     opened,
+    sidebarTabs: [],
     get(name) {
+      if (name === 'sidebarRight' && options.sidebar) return options.sidebar
       if (name !== 'uiWorkspace' || options.noWorkspace) return undefined
       return { openSession(id) { opened.push(id) } }
     },
@@ -172,6 +176,29 @@ test('点击通知拿不到 onclick 时，窗口 focus 兜底跳转；页面内�
   envB.winListeners.focus()
   assert.deepEqual(ctxB.opened, [], '页面内手动点击后不自动跳转')
   ctxB.dispose()
+})
+
+test('sidechat 子会话点击通知时开在右侧边栏，而不是主视图', async () => {
+  const env = makeEnv()
+  const mod = await env.load()
+  const tabs = []
+  globalThis.window.localStorage.setItem('dsh.sidechat.v1.threads.parent-1', JSON.stringify([{ childId: 'sc1', topic: '' }]))
+  const byId = {
+    sc1: { running: true, displayTitle: '侧聊', projectionValues: { [KEY]: { seq: 1, endedAt: 1, text: '', title: '' } } },
+  }
+  const sidebar = { openTab(kind, opts) { tabs.push({ kind, opts }) } }
+  const ctx = makeCtx(byId, { sidebar })
+  mod.apply(ctx)
+  byId.sc1.running = false
+  byId.sc1.projectionValues[KEY] = { seq: 2, endedAt: Date.now(), text: '会话「侧聊」已完成。', title: '任务已完成' }
+  ctx.fire()
+  await new Promise((r) => setTimeout(r, 400))
+  env.notifications[0].onclick()
+  assert.equal(tabs.length, 1)
+  assert.equal(tabs[0].kind, 'side-chat')
+  assert.deepEqual(tabs[0].opts.params, { parentSessionId: 'parent-1', childId: 'sc1' })
+  assert.deepEqual(ctx.opened, [], '不应打开成主会话')
+  ctx.dispose()
 })
 
 test('没有 uiWorkspace 服务时退回 sessions.open', async () => {

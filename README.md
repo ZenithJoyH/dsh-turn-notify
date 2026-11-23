@@ -58,9 +58,15 @@ source: { kind: 'plugin:dsh-turn-notify', reasonKind, titleText, turn, endedAt }
 
 ## 点击通知跳转
 
-系统通知的 `onclick` 优先调用 **`ctx.get('uiWorkspace').openSession(sessionId)`**——这是侧栏点击
-会话时实际走的入口（会切换主视图标签）；旧宿主没有 `uiWorkspace` 时退回 `ctx.sessions.open()`，
-再不行只聚焦窗口。（注意：`ctx.sessions` 上并没有 `open()`，之前用它只会得到 `open-missing`。）
+系统通知的 `onclick`：
+
+1. **sidechat 子会话**：先查 `localStorage['dsh.sidechat.v1.threads.<parentId>']` 找到父会话，
+   再走 `ctx.get('sidebarRight').openTab('side-chat', {params:{parentSessionId, childId}})`，
+   开在**右侧边栏**里（否则会被当成主会话打开）；
+2. **普通会话**：`ctx.get('uiWorkspace').openSession(sessionId)`——侧栏点击会话时走的入口；
+3. 旧宿主退回 `ctx.sessions.open()`，再不行只聚焦窗口。
+
+> `ctx.sessions` 上并没有 `open()`，之前用它只会得到 `open-missing`。
 
 macOS/Electron 下点击系统通知有时只把窗口带到前台、不触发渲染进程的 `onclick`，
 因此还有一层兜底：发通知时记下会话，窗口在 20 秒内重新获得焦点就直接跳转；
