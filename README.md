@@ -70,9 +70,8 @@ source: { kind: 'plugin:dsh-turn-notify', reasonKind, titleText, turn, endedAt }
 
 > `ctx.sessions` 上并没有 `open()`，之前用它只会得到 `open-missing`。
 
-macOS/Electron 下点击系统通知有时只把窗口带到前台、不触发渲染进程的 `onclick`，
-因此还有一层兜底：发通知时记下会话，窗口在 20 秒内重新获得焦点就直接跳转；
-如果用户先在页面里点了一下（mousedown），视为手动切窗口，取消这次自动跳转。
+**只有点击通知才会跳转**：不做「窗口重新获得焦点就跳」的兜底——那样用户只是手动切回
+DSH 也会被强行带到某个会话，体验不可接受。（早期版本有过焦点兜底，已移除。）
 
 兜底 toast 卡片本身不接收鼠标，但带一个可点的「查看」按钮，点击同样跳转。
 

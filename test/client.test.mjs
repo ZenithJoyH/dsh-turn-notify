@@ -142,40 +142,27 @@ test('旧投影不会触发推送，新投影才推送（内容对应本轮）',
   ctx.dispose()
 })
 
-test('点击通知拿不到 onclick 时，窗口 focus 兜底跳转；页面内点击则取消', async () => {
-  // 情况 A：通知后窗口获得焦点（Electron 点击通知的典型行为）→ 跳转
-  const envA = makeEnv()
-  const modA = await envA.load()
-  const byIdA = {
+test('窗口获得焦点不会自动跳转，只有点击通知才跳转', async () => {
+  const env = makeEnv()
+  const mod = await env.load()
+  const byId = {
     s3: { running: true, displayTitle: 'A', projectionValues: { [KEY]: { seq: 1, endedAt: 1, text: '', title: '' } } },
   }
-  const ctxA = makeCtx(byIdA)
-  modA.apply(ctxA)
-  byIdA.s3.running = false
-  byIdA.s3.projectionValues[KEY] = { seq: 2, endedAt: Date.now(), text: '会话「A」已完成。', title: '任务已完成' }
-  ctxA.fire()
+  const ctx = makeCtx(byId)
+  mod.apply(ctx)
+  byId.s3.running = false
+  byId.s3.projectionValues[KEY] = { seq: 2, endedAt: Date.now(), text: '会话「A」已完成。', title: '任务已完成' }
+  ctx.fire()
   await new Promise((r) => setTimeout(r, 400))
-  assert.equal(envA.notifications.length, 1)
-  envA.winListeners.focus()
-  assert.deepEqual(ctxA.opened, ['s3'], 'focus 兜底打开会话')
-  ctxA.dispose()
 
-  // 情况 B：用户先在页面里点了一下（mousedown）→ 说明是手动切窗口，不跳转
-  const envB = makeEnv()
-  const modB = await envB.load()
-  const byIdB = {
-    s4: { running: true, displayTitle: 'B', projectionValues: { [KEY]: { seq: 1, endedAt: 1, text: '', title: '' } } },
-  }
-  const ctxB = makeCtx(byIdB)
-  modB.apply(ctxB)
-  byIdB.s4.running = false
-  byIdB.s4.projectionValues[KEY] = { seq: 2, endedAt: Date.now(), text: '会话「B」已完成。', title: '任务已完成' }
-  ctxB.fire()
-  await new Promise((r) => setTimeout(r, 400))
-  envB.docListeners.mousedown({})
-  envB.winListeners.focus()
-  assert.deepEqual(ctxB.opened, [], '页面内手动点击后不自动跳转')
-  ctxB.dispose()
+  // 不再注册 focus 自动跳转：窗口切回来不会带你去任何会话
+  assert.equal(typeof env.winListeners.focus, 'undefined', '不应注册 focus 自动跳转')
+  assert.deepEqual(ctx.opened, [])
+
+  // 只有点击通知才跳转
+  env.notifications[0].onclick()
+  assert.deepEqual(ctx.opened, ['s3'])
+  ctx.dispose()
 })
 
 test('sidechat 子会话点击通知时开在右侧边栏，而不是主视图', async () => {
